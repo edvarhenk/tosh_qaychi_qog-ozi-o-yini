@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="uz">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tosh Qog'oz Qaychi - Zamonaviy Versiya 2.0</title>
+    <script
+        src="https://cdnjs.cloudflare.com/ajax/libs/soundmanager2/2.97a.20170601/script/soundmanager2-nodebug-jsmin.js"></script>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            transition: background-color 0.3s, color 0.3s;
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><text x="50" y="50" font-size="70" text-anchor="middle" dy=".35em">🎮</text></svg>');
+            animation: backgroundScroll 20s linear infinite;
+        }
+
+        @keyframes backgroundScroll {
+            from {
+                background-position: 0 0;
+            }
+
+            to {
+                background-position: 100% 100%;
+            }
+        }
+
+        .game-container {
+            text-align: center;
+            background-color: rgba(255, 255, 255, 0.8);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .choice-btn {
+            font-size: 2em;
+            margin: 10px;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .choice-btn:hover {
+            transform: scale(1.1);
+        }
+
+        #result,
+        #score,
+        #streak,
+        #timer,
+        #dailyTask {
+            font-size: 1.2em;
+            margin: 10px 0;
+        }
+
+        .theme-toggle {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            cursor: pointer;
+        }
+
+        .powerup {
+            color: gold;
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="theme-toggle" onclick="toggleTheme()">🌓</div>
+    <div class="game-container">
+        <h1>Tosh Qog'oz Qaychi 2.0 🎮</h1>
+        <div id="timer">Vaqt: 60s</div>
+        <div id="dailyTask"></div>
+        <div>
+            <button class="choice-btn" onclick="play('tosh')">🗿</button>
+            <button class="choice-btn" onclick="play('qogoz')">📄</button>
+            <button class="choice-btn" onclick="play('qaychi')">✂️</button>
+        </div>
+        <div id="result"></div>
+        <div id="score">O'yinchi: 0 - Kompyuter: 0</div>
+        <div id="streak">Ketma-ket g'alabalar: 0</div>
+        <button onclick="startGame()">Yangi o'yin</button>
+    </div>
+
+    <script>
+        let playerScore = 0;
+        let computerScore = 0;
+        let isLightTheme = true;
+        let winStreak = 0;
+        let powerupAvailable = false;
+        let timeLeft = 60;
+        let comboCount = 0;
+        let gameCount = 0;
+        let dailyTask = { type: '', count: 0, target: 5 };
+        let timerInterval;
+
+        soundManager.setup({
+            url: 'https://cdnjs.cloudflare.com/ajax/libs/soundmanager2/2.97a.20170601/swf/',
+            onready: function () {
+                soundManager.createSound({
+                    id: 'win',
+                    url: 'https://assets.mixkit.co/sfx/preview/mixkit-winning-chimes-2015.mp3'
+                });
+                soundManager.createSound({
+                    id: 'lose',
+                    url: 'https://assets.mixkit.co/sfx/preview/mixkit-retro-arcade-lose-2027.mp3'
+                });
+                soundManager.createSound({
+                    id: 'draw',
+                    url: 'https://assets.mixkit.co/sfx/preview/mixkit-neutral-bot-pinbal-tone-3137.mp3'
+                });
+            }
+        });
+
+        function startGame() {
+            playerScore = 0;
+            computerScore = 0;
+            winStreak = 0;
+            comboCount = 0;
+            gameCount = 0;
+            timeLeft = 60;
+            updateTimer();
+            generateDailyTask();
+            updateUI('', '', '');
+        }
+
+        function updateTimer() {
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                document.getElementById('timer').textContent = `Vaqt: ${timeLeft}s`;
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    endGame();
+                }
+            }, 1000);
+        }
+
+        function play(playerChoice) {
+            if (timeLeft <= 0) return;
+
+            gameCount++;
+            const computerChoice = getComputerChoice();
+            const result = getResult(playerChoice, computerChoice);
+
+            if (result === 'win') {
+                comboCount++;
+                playerScore += comboCount;
+                winStreak++;
+                if (winStreak % 3 === 0) {
+                    powerupAvailable = true;
+                    alert("Powerup mavjud! Keyingi yurish ikki barobar ball beradi.");
+                }
+            } else {
+                comboCount = 0;
+                winStreak = 0;
+            }
+
+            if (gameCount % 10 === 0) {
+                goldenHand();
+            }
+
+            updateDailyTask(playerChoice, result);
+            displayResult(playerChoice, computerChoice, result);
+            playSound(result);
+            updateWinStreak();
+        }
+
+        function getComputerChoice() {
+            const choices = ['tosh', 'qogoz', 'qaychi'];
+            return choices[Math.floor(Math.random() * choices.length)];
+        }
+
+        function getResult(player, computer) {
+            if (player === computer) return 'draw';
+            if ((player === 'tosh' && computer === 'qaychi') ||
+                (player === 'qogoz' && computer === 'tosh') ||
+                (player === 'qaychi' && computer === 'qogoz')) {
+                return 'win';
+            }
+            return 'lose';
+        }
+
+        function displayResult(player, computer, result) {
+            const resultDiv = document.getElementById('result');
+            const scoreDiv = document.getElementById('score');
+
+            const emoji = { tosh: '🗿', qogoz: '📄', qaychi: '✂️' };
+            const resultText = { win: 'Yutdingiz! 🎉', lose: 'Yutqazdingiz 😢', draw: 'Durrang 🤝' };
+
+            resultDiv.innerHTML = `Siz: ${emoji[player]} vs Kompyuter: ${emoji[computer]}<br>${resultText[result]}`;
+            if (powerupAvailable) {
+                resultDiv.innerHTML += "<br><span class='powerup'>Powerup faol! 🌟</span>";
+            }
+            scoreDiv.textContent = `O'yinchi: ${playerScore} - Kompyuter: ${computerScore}`;
+        }
+
+        function playSound(result) {
+            soundManager.play(result);
+        }
+
+        function toggleTheme() {
+            isLightTheme = !isLightTheme;
+            document.body.style.backgroundColor = isLightTheme ? 'white' : 'black';
+            document.body.style.color = isLightTheme ? 'black' : 'white';
+        }
+
+        function updateWinStreak() {
+            const streakDiv = document.getElementById('streak');
+            streakDiv.textContent = `Ketma-ket g'alabalar: ${winStreak}`;
+        }
+
+        function goldenHand() {
+            alert("Oltin qo'l! Avtomatik g'alaba!");
+            playerScore += 5;
+        }
+
+        function generateDailyTask() {
+            const tasks = ['tosh', 'qogoz', 'qaychi'];
+            dailyTask.type = tasks[Math.floor(Math.random() * tasks.length)];
+            dailyTask.count = 0;
+            document.getElementById('dailyTask').textContent = `Kunlik vazifa: ${dailyTask.type} bilan 5 marta yuting`;
+        }
+
+        function updateDailyTask(choice, result) {
+            if (choice === dailyTask.type && result === 'win') {
+                dailyTask.count++;
+                if (dailyTask.count === dailyTask.target) {
+                    alert("Kunlik vazifa bajarildi! +10 ball");
+                    playerScore += 10;
+                    generateDailyTask();
+                }
+            }
+        }
+
+        function endGame() {
+            alert(`O'yin tugadi! Sizning ballingiz: ${playerScore}`);
+        }
+
+        generateDailyTask();
+    </script>
+</body>
+
+</html>
